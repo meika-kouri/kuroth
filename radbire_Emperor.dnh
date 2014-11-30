@@ -2,6 +2,7 @@
 #Title["幻幽「ジャック・ザ・ルドビレ」 -Emperor-"]
 #Text["###前世はスキマ送りにされました###[r]赤司征十郎（前世：十六夜咲夜）"]
 #ScriptVersion[3]
+#Player["./player/KOKUBYAKU/KOKUBYAKU_Player.txt"]
 
 #include"script/default_system/Default_ShotConst.txt"
 #include"script/default_system/Default_Effect.txt"

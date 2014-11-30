@@ -3,7 +3,7 @@
 #ID["KOKUBYAKU"]
 #Title["黄瀬涼太"]
 #Text["#前世はスキマ送りにされました#[r]前世：霧雨魔理沙"]
-#Image["./KOKUBYAKU_通常.png"]
+#Image["./KOKUBYAKU_Select.png"]
 #ReplayName["Rumia"]
 
 let objPlayer = GetPlayerObjectID();
