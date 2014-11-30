@@ -1,0 +1,131 @@
+#東方弾幕風[Single]
+#Title["幻幽「ジャック・ザ・ルドビレ」 -Emperor-"]
+#Text["###前世はスキマ送りにされました###[r]赤司征十郎（前世：十六夜咲夜）"]
+#ScriptVersion[3]
+
+#include"script/default_system/Default_ShotConst.txt"
+#include"script/default_system/Default_Effect.txt"
+#include"script/meika_lib/basicBullet.txt"
+#include"script/meika_lib/basicEffect.txt"
+
+let objBoss;
+
+@Event
+{
+	alternative(GetEventType())
+	case(EV_REQUEST_LIFE)
+	{
+		SetScriptResult(1000);
+	}
+	case(EV_REQUEST_SPELL_SCORE)
+	{
+		SetScriptResult(200000);
+	}
+}
+
+@Initialize
+{
+	objBoss = ObjEnemy_Create(OBJ_ENEMY_BOSS);
+	ObjEnemy_Regist(objBoss);
+
+	let imgMarise = GetCurrentScriptDirectory ~ "img/KOKUBYAKU_BOSS.png";
+	ObjPrim_SetTexture(objBoss, imgMarise);
+	ObjSprite2D_SetSourceRect(objBoss, 1, 1, 64, 64);
+	ObjSprite2D_SetDestCenter(objBoss);
+
+	ObjEnemy_SetDamageRate(objBoss, 10, 10);
+
+
+	TWork;
+	TRender;
+	TEnd;
+}
+
+@MainLoop
+{
+	let ex = ObjMove_GetX(objBoss);
+	let ey = ObjMove_GetY(objBoss);
+
+	ObjEnemy_SetIntersectionCircleToShot(objBoss, ex, ey, 32);
+	ObjEnemy_SetIntersectionCircleToPlayer(objBoss, ex, ey, 24);
+
+	
+	yield;
+}
+
+let bigStop = 30; //赤大弾止まるまでのフレーム数
+let timeStop = 300; //時間停止解除までのフレーム数
+task TWork
+{
+	let cx = GetStgFrameWidth() / 2;
+	ObjMove_SetX(objBoss, cx);
+	ObjMove_SetDestAtFrame(objBoss, cx, 60, 60);
+	loop(60){yield;}
+
+	let objScene = GetEnemyBossSceneObjectID();
+	ObjEnemyBossScene_StartSpell(objScene);
+	TSpellCall("幻幽「ジャック・ザ・ルドビレ」");
+
+	loop(120){yield;}
+	
+	ObjEnemy_SetDamageRate(objBoss, 100, 100);
+
+	while(ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0){
+		let ex = ObjMove_GetX(objBoss);
+		let ey = ObjMove_GetY(objBoss);
+
+		let angle = atan2(GetPlayerY() - ey,  GetPlayerX() - ex);
+		
+		loop(8){ //赤大弾　見直したら大雑把3方向っぽい
+			bulletBig(ex, ey, angle);
+			bulletBig(ex, ey, angle + 45);
+			bulletBig(ex, ey, angle - 45);
+		}
+		loop(bigStop){ yield; }
+		SetForbidPlayerShot(true);
+		SetForbidPlayerSpell(true);
+		let cy = GetStgFrameHeight / 2;
+		let shots = GetShotIdInCircleA1(cx, cy, cx + cy);
+		let scnt = GetShotCount(TARGET_PLAYER);
+		ascent(i in 0..scnt){
+			let bs = ObjMove_GetSpeed(shots[i]);
+			ObjMove_SetSpeed(shots[i], 0);
+			ObjMove_AddPatternA1(shots[i], timeStop - bigStop, bs, NO_CHANGE);
+		}
+		loop(timeStop - bigStop){ yield; }
+		SetForbidPlayerShot(false);
+		SetForbidPlayerSpell(false);
+		
+		loop(60){ yield; }
+	}
+}
+
+function bulletBig(ex, ey, angle){
+	let big = CreateShotA1(ex, ey, rand(30, GetStgFrameHeight / 2) / 30, angle + rand(-15, 15), DS_BALL_L_RED, 0);
+	ObjMove_AddPatternA1(big, bigStop, 0, NO_CHANGE);
+	ObjMove_AddPatternA2(big, timeStop, NO_CHANGE, NO_CHANGE, 0.1, 0, 4);
+}
+
+task TRender
+{
+	
+}
+
+task TEnd
+{
+	while(ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0)
+	{
+		yield;
+	}
+
+	let ex = ObjMove_GetX(objBoss);
+	let ey = ObjMove_GetY(objBoss);
+	TExplosionA(ex, ey, 10, 0.6);
+
+	Obj_Delete(objBoss);
+
+	loop(30){yield;}
+	DeleteShotAll(TYPE_ALL, TYPE_ITEM);
+
+	CloseScript(GetOwnScriptID());
+}

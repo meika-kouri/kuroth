@@ -1,0 +1,160 @@
+#東方弾幕風
+#Title["「シャララ☆スパーク(仮)」"]
+#Text["###前世はスキマ送りにされました###[r]黄瀬涼太 (前世：霧雨魔理沙)"]
+#ScriptVersion[3]
+
+#include"script/default_system/Default_ShotConst.txt"
+#include"script/default_system/Default_Effect.txt"
+#include"script/meika_lib/basicBullet.txt"
+#include"script/meika_lib/basicEffect.txt"
+
+let objBoss;
+
+@Event
+{
+	alternative(GetEventType())
+	case(EV_REQUEST_LIFE)
+	{
+		SetScriptResult(1000);
+	}
+	case(EV_REQUEST_SPELL_SCORE)
+	{
+		SetScriptResult(200000);
+	}
+}
+
+@Initialize
+{
+	objBoss = ObjEnemy_Create(OBJ_ENEMY_BOSS);
+	ObjEnemy_Regist(objBoss);
+
+	let imgMarise = GetCurrentScriptDirectory ~ "img/KOKUBYAKU_BOSS.png";
+	ObjPrim_SetTexture(objBoss, imgMarise);
+	ObjSprite2D_SetSourceRect(objBoss, 1, 1, 64, 64);
+	ObjSprite2D_SetDestCenter(objBoss);
+
+	ObjEnemy_SetDamageRate(objBoss, 10, 10);
+
+
+	TWork;
+	TRender;
+	TEnd;
+}
+
+@MainLoop
+{
+	let ex = ObjMove_GetX(objBoss);
+	let ey = ObjMove_GetY(objBoss);
+
+	ObjEnemy_SetIntersectionCircleToShot(objBoss, ex, ey, 32);
+	ObjEnemy_SetIntersectionCircleToPlayer(objBoss, ex, ey, 24);
+
+	
+	yield;
+}
+
+task TWork
+{
+	let cx = GetStgFrameWidth() / 2;
+	ObjMove_SetX(objBoss, cx);
+	ObjMove_SetDestAtFrame(objBoss, cx, 60, 60);
+	loop(60){yield;}
+
+	let objScene = GetEnemyBossSceneObjectID();
+	ObjEnemyBossScene_StartSpell(objScene);
+	TSpellCall("恋符「シャララ☆スパーク」");
+
+	ObjEnemy_SetDamageRate(objBoss, 100, 100);
+	
+
+	while(ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0){
+		loop(30){yield;}
+
+		let ex = ObjMove_GetX(objBoss);
+		let ey = ObjMove_GetY(objBoss);
+
+		if(ObjEnemy_GetInfo(objBoss, INFO_LIFE) <= 0){ break; }
+		let angle = atan2(GetPlayerY() - ey,  GetPlayerX() - ex);
+		TLasor(ex, ey, angle);
+		loop(18){
+			ascent(i in 0..5){
+				let b = CreateShotA2(ex, ey, 5, angle - 180 + (360 / 5) * i, - 0.1, 0, DS_STAR_M_BLUE, 0);
+				ObjMove_AddPatternA2(b, 180, NO_CHANGE, NO_CHANGE, 0.1, 0, 4);
+				let b2 = CreateShotA2(ex, ey, 5, 360 - (angle - 180 + (360 / 5) * i), - 0.1, 0, DS_STAR_M_BLUE, 0);
+				ObjMove_AddPatternA2(b2, 180, NO_CHANGE, NO_CHANGE, 0.1, 0, 4); 
+			}
+			loop(5){yield;}
+			ascent(i in 0..5){
+				CreateShotA1(ex, ey, 3, angle + (360 / 5) * i, DS_STAR_S_WHITE, 0);
+			}
+			loop(5){yield;}
+			angle += (360 / 5) / 7;
+		}
+		let px = GetPlayerX();
+		ObjMove_SetDestAtWeight(objBoss, px, ey, 20, 4);
+		if(ObjEnemy_GetInfo(objBoss, INFO_LIFE) <= 0){ break; }
+		TShine(px);
+		loop(20){ yield; }
+	}
+}
+
+task TLasor(ex, ey, angle){
+	let laserBaseWidth = GetStgFrameWidth / 4;
+	let mainLasor = CreateStraightLaserA1(ex, ey, angle, GetStgFrameHeight * 1.5, laserBaseWidth, 120, DS_BALL_M_YELLOW, 60);
+	loop(60){ yield; }
+	//	レーザー撃ってる間画面振動
+	let centerX = GetStgFrameWidth / 2;
+	let centerY = GetStgFrameHeight / 2;
+	let swingX = cos(angle - 90);
+	let swingY = sin(angle - 90);
+	let addWidth = (GetStgFrameWidth / 4) / 120;
+	ascent(let i in 1..120){
+		ObjLaser_SetRenderWidth(mainLasor, laserBaseWidth + addWidth * i);
+		Set2DCameraFocusX(centerX + rand(-swingX, swingX) * 10);
+		Set2DCameraFocusY(centerY + rand(-swingY, swingY) * 10);
+		yield;
+	}
+	Reset2DCamera();
+}
+
+task TShine(px) {
+		let dir;
+		if(px - ObjMove_GetX(objBoss) > 0){
+			dir = 1;
+		}
+		else{	
+			dir = -1;
+		}
+		loop(3){
+			ascent(i in 1..3){
+				//途中でシャラる。
+				nwayShot(3, ObjMove_GetX(objBoss) + rand(-10, 10), ObjMove_GetY(objBoss) + rand(-40, -10) + i * 10 , 2, dir * 30 - 90, 30, DS_STAR_S_YELLOW, 0);
+				//CreateShotB2(ObjMove_GetX(objBoss) + rand(-10, 10), ObjMove_GetY(objBoss) + rand(-40, -10) + i * 10 , dir, 0, 0.001, 0.1, 4, 4, DS_STAR_S_YELLOW, 0);
+				loop(7){ yield; }
+			}
+		}
+}
+
+task TRender
+{
+	
+}
+
+task TEnd
+{
+	while(ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0)
+	{
+		yield;
+	}
+
+	let ex = ObjMove_GetX(objBoss);
+	let ey = ObjMove_GetY(objBoss);
+	TExplosionA(ex, ey, 10, 0.6);
+
+	Obj_Delete(objBoss);
+
+	loop(30){yield;}
+	DeleteShotAll(TYPE_ALL, TYPE_ITEM);
+
+	CloseScript(GetOwnScriptID());
+}

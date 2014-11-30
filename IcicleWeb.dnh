@@ -1,0 +1,95 @@
+#東方弾幕風
+#Title["氷網「アイシクルウェブ」"]
+#Text["###前世はスキマ送りにされました###[r]花宮真 (前世：チルノ)"]
+#ScriptVersion[3]
+
+#include"script/default_system/Default_ShotConst.txt"
+#include"script/default_system/Default_Effect.txt"
+
+let objBoss;
+
+@Event
+{
+	alternative(GetEventType())
+	case(EV_REQUEST_LIFE)
+	{
+		SetScriptResult(1000);
+	}
+	case(EV_REQUEST_SPELL_SCORE)
+	{
+		SetScriptResult(200000);
+	}
+}
+
+@Initialize
+{
+	objBoss = ObjEnemy_Create(OBJ_ENEMY_BOSS);
+	ObjEnemy_Regist(objBoss);
+
+	let imgMarise = GetCurrentScriptDirectory ~ "img/KOKUBYAKU.png";
+	ObjPrim_SetTexture(objBoss, imgMarise);
+	ObjSprite2D_SetSourceRect(objBoss, 64, 1, 127, 64);
+	ObjSprite2D_SetDestCenter(objBoss);
+
+	ObjEnemy_SetDamageRate(objBoss, 10, 10);
+
+	let cx = GetStgFrameWidth() / 2;
+	ObjMove_SetX(objBoss, cx);
+	ObjMove_SetDestAtFrame(objBoss, cx, 60, 60);
+
+	TWork;
+	TRender;
+	TEnd;
+}
+
+@MainLoop
+{
+	let ex = ObjMove_GetX(objBoss);
+	let ey = ObjMove_GetY(objBoss);
+
+	ObjEnemy_SetIntersectionCircleToShot(objBoss, ex, ey, 32);
+	ObjEnemy_SetIntersectionCircleToPlayer(objBoss, ex, ey, 24);
+
+	
+	yield;
+}
+
+task TWork
+{
+	loop(60){yield;}
+	
+	ObjEnemy_SetDamageRate(objBoss, 100, 100);
+
+	while(ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0){
+		let ex = ObjMove_GetX(objBoss);
+		let ey = ObjMove_GetY(objBoss);
+		loop(30){yield;}
+
+		if(ObjEnemy_GetInfo(objBoss, INFO_LIFE) <= 0){ break; }
+		let angle = atan2(GetPlayerY() - ey,  GetPlayerX() - ex);
+	}
+}
+
+task TRender
+{
+	
+}
+
+task TEnd
+{
+	while(ObjEnemy_GetInfo(objBoss, INFO_LIFE) > 0)
+	{
+		yield;
+	}
+
+	let ex = ObjMove_GetX(objBoss);
+	let ey = ObjMove_GetY(objBoss);
+	TExplosionA(ex, ey, 10, 0.6);
+
+	Obj_Delete(objBoss);
+
+	loop(30){yield;}
+	DeleteShotAll(TYPE_ALL, TYPE_ITEM);
+
+	CloseScript(GetOwnScriptID());
+}

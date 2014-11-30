@@ -1,0 +1,21 @@
+shot_image  = "./Default_Player_RumiaShot.png"
+
+ShotData
+{
+	id = 1 //ID
+	rect = (1,1,31,31) //•`‰æŒ³‹éŒ`
+	render = ADD //•`‰æ•û–@
+	alpha=64
+	collision = 16
+}
+
+
+ShotData
+{
+	id = 2 //ID
+	rect = (1,32,48,80)  //•`‰æŒ³‹éŒ`
+	render = ADD //•`‰æ•û–@
+	alpha=64
+	collision = 24
+}
+

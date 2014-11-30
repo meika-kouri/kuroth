@@ -1,0 +1,497 @@
+#東方弾幕風[Player]
+#ScriptVersion[3]	//スクリプトバージョン3が必須です
+#ID["KOKUBYAKU"]
+#Title["黄瀬涼太"]
+#Text["#前世はスキマ送りにされました#[r]前世：霧雨魔理沙"]
+#Image["./KOKUBYAKU_通常.png"]
+#ReplayName["Rumia"]
+
+let objPlayer = GetPlayerObjectID();
+let objSlowShot = ID_INVALID;
+let current = GetCurrentScriptDirectory();
+@Initialize
+{
+	let path = current ~ "Default_Player_RumiaShotData.txt";
+	LoadPlayerShotData(path); //自弾画像ロード
+
+	ObjPlayer_AddIntersectionCircleA1(objPlayer, 0, 0, 1, 20); //当たり判定登録
+
+	TImage();//自機描画用タスク起動
+	TShot();//弾発射用タスク起動
+	TMagicCircle();//無敵時間魔法陣タスク起動
+}
+
+@MainLoop
+{
+	yield;
+}
+
+@Finalize
+{
+}
+
+@Event
+{
+	alternative(GetEventType())
+	case(EV_REQUEST_SPELL)
+	{
+		//スペルカード要求
+		let spell = GetPlayerSpell();//残りスペル数
+		if(spell >= 1)
+		{
+			SetScriptResult(true);//スペル発動可能
+			SetPlayerSpell(spell-1);//スペル数を1減らす
+			TSpell();//スペルタスク起動
+		}
+		else
+		{
+			SetScriptResult(false);//スペル発動不可
+		}
+	}
+	case(EV_HIT)
+	{
+		//被弾
+		TExplosion();
+	}
+	case(EV_PLAYER_REBIRTH)
+	{
+		//復帰
+		SetPlayerSpell(3);
+		SetPlayerInvincibilityFrame(180);
+	}
+	case(EV_GET_ITEM)
+	{
+		//アイテム取得通知
+		let itemType = GetEventArgument(0);
+		alternative(itemType)
+		case(ITEM_SPELL)
+		{
+			//WriteLog("ITEM_SPELL");
+		}
+		case(ITEM_SPELL_S)
+		{
+			//WriteLog("ITEM_SPELL_S");
+		}
+		case(ITEM_POWER)
+		{
+			//WriteLog("ITEM_POWER");
+		}
+		case(ITEM_POWER_S)
+		{
+			//WriteLog("ITEM_POWER_S");
+		}
+	}
+
+}
+
+task TImage
+{
+	let path = GetCurrentScriptDirectory() ~ "Default_Player_Rumia.png";
+	ObjPrim_SetTexture(objPlayer, path);
+	loop
+	{
+		if(GetVirtualKeyState(VK_LEFT) == KEY_PUSH || GetVirtualKeyState(VK_LEFT) == KEY_HOLD)
+		{
+			ObjSprite2D_SetSourceRect(objPlayer, 1, 133, 49, 188);
+		}
+		else if(GetVirtualKeyState(VK_RIGHT) == KEY_PUSH || GetVirtualKeyState(VK_RIGHT) == KEY_HOLD)
+		{
+			ObjSprite2D_SetSourceRect(objPlayer, 1, 69, 49, 124);
+		}
+		else
+		{
+			ObjSprite2D_SetSourceRect(objPlayer, 1, 5, 49, 60);
+		}
+		ObjSprite2D_SetDestCenter(objPlayer);
+		yield;
+	}
+
+}
+
+task TShot
+{
+	let shotCount = -1;//弾を連続で発射するための変数
+	let bNextShot = false;//ちょん押しでも自弾を連続発射するための変数(説明しづらい)
+	let objShot = ID_INVALID;//誘導弾
+
+	loop
+	{
+		if((GetVirtualKeyState(VK_SHOT)==KEY_PUSH || GetVirtualKeyState(VK_SHOT)==KEY_HOLD || bNextShot==true) && shotCount==-1)
+		{
+			shotCount = 0;
+			bNextShot = false;
+		}
+		if(GetVirtualKeyState(VK_SHOT)==KEY_HOLD && shotCount>0)
+		{
+			bNextShot = true;
+		}
+		if(GetVirtualKeyState(VK_SLOWMOVE)==KEY_PUSH || GetVirtualKeyState(VK_SLOWMOVE)==KEY_HOLD)
+		{	//低速移動時の自弾
+			if(shotCount != -1)
+			{
+				TSlowShot();
+			}
+			if(shotCount%5 == 0)
+			{
+				CreatePlayerShotA1(GetPlayerX(), GetPlayerY()-16, 15, 265, 1.3, 2, 1);
+				CreatePlayerShotA1(GetPlayerX(), GetPlayerY()-16, 15, 270, 1.5, 3, 1);
+				CreatePlayerShotA1(GetPlayerX(), GetPlayerY()-16, 15, 275, 1.3, 2, 1);
+			}
+		}
+		else
+		{	//高速移動自の自弾発射
+			Obj_Delete(objSlowShot);//高速移動時は低速移動時の特殊弾を削除
+			if(shotCount%5 == 0)
+			{
+				CreatePlayerShotA1(GetPlayerX(), GetPlayerY()-16, 15, 255, 1.3, 1, 1);
+				CreatePlayerShotA1(GetPlayerX(), GetPlayerY()-16, 15, 265, 1.5, 2, 1);
+				CreatePlayerShotA1(GetPlayerX(), GetPlayerY()-16, 15, 270, 1.7, 3, 1);
+				CreatePlayerShotA1(GetPlayerX(), GetPlayerY()-16, 15, 275, 1.5, 2, 1);
+				CreatePlayerShotA1(GetPlayerX(), GetPlayerY()-16, 15, 285, 1.3, 1, 1);
+			}		
+		}
+
+		if(shotCount >= 0)
+		{
+			shotCount++;
+		}
+		if(shotCount == 30)
+		{
+			shotCount=-1;
+		}
+		yield;
+	}
+
+
+}
+
+task TSlowShot()
+{	//低速移動時の誘導弾
+	//敵を追尾してダメージを与える
+	if(!Obj_IsDeleted(objSlowShot)){return;}//1個しか存在しない
+
+	objSlowShot = ObjShot_Create(OBJ_SHOT);
+	ObjMove_SetX(objSlowShot, GetPlayerX);//x座標設定
+	ObjMove_SetY(objSlowShot, GetPlayerY);//y座標設定;
+	ObjMove_SetSpeed(objSlowShot, 5);//速度設定
+	ObjShot_SetGraphic(objSlowShot, 2);//画像設定
+	ObjShot_SetDamage(objSlowShot, 2);//ダメージを設定
+	ObjShot_SetPenetration(objSlowShot, 1000000);//貫通力は適当に大きく
+	ObjShot_Regist(objSlowShot);
+
+	while( !Obj_IsDeleted(objSlowShot) )
+	{//削除されるまでループを実行		
+		//ホーミング
+		let sx = ObjMove_GetX(objSlowShot);
+		let sy = ObjMove_GetY(objSlowShot);
+		let tx = GetPlayerX();
+		let ty = GetPlayerY();
+		let pos = GetEnemyIntersectionPosition(sx, sy, 1);
+		if(length(pos) > 0)
+		{
+			tx = pos[0][0];
+			ty = pos[0][1];
+		}
+		let toAngle=atan2(ty - sy, tx - sx);
+		ObjMove_SetAngle(objSlowShot, toAngle);
+		yield;
+	}
+
+}
+
+task TMagicCircle
+{
+	//無敵時間の魔法陣
+	//頂点奇数：偶数：円の外側、円の内側
+	let countVertex = 64;
+	let listRadius = [];
+	loop(countVertex)
+	{
+		listRadius = listRadius ~ [0];
+	}
+
+	let path = current ~ "Default_Player_MagicCircle.png";
+	let obj = ObjPrim_Create(OBJ_PRIMITIVE_2D);
+	ObjPrim_SetPrimitiveType(obj, PRIMITIVE_TRIANGLESTRIP);
+	ObjPrim_SetVertexCount(obj, countVertex);
+	ObjRender_SetBlendType(obj, BLEND_ADD_RGB);
+	Obj_SetRenderPriority(obj, 0.60);
+	ObjPrim_SetTexture(obj, path);
+	ascent(iVert in 0..countVertex / 2)
+	{
+		let left = iVert * 128;
+		let indexVert = iVert * 2;
+		ObjPrim_SetVertexUVT(obj, indexVert + 0, left, 0);
+		ObjPrim_SetVertexUVT(obj, indexVert + 1, left, 64);		
+	}
+
+	let cx = 0;
+	let cy = 0;
+	let maxRadius = 128;
+	let alpha = 0;
+	let frame = 0;
+	let angleRender = 0;
+	let frameInvOld = 0;
+
+	while(true)
+	{
+		let frameInv = GetPlayerInvincibilityFrame();
+
+		if(frameInv <= 0)
+		{
+			Obj_SetVisible(obj, false);
+			frameInvOld = 0;
+		}
+		else
+		{
+			if(frameInvOld == 0)
+			{
+				//初期化
+				ascent(iVert in 0..countVertex)
+				{
+					listRadius[iVert] = 0;
+				}
+				alpha = 0;
+				frame = 0;
+			}
+			frameInvOld = frameInv;
+
+			let px = GetPlayerX();
+			let py = GetPlayerY();
+
+			alpha += 1 / 120;
+			alpha = min(alpha, 1);
+			angleRender += 360 / countVertex / 2;
+			Obj_SetVisible(obj, true);
+
+			frameInv = min(100, frameInv);
+			let rRate = frameInv / 100;
+
+			ascent(iVert in 0..countVertex / 2)
+			{
+				let indexVert = iVert * 2;
+				let angle = 360 / (countVertex / 2 - 1) * iVert;
+
+				let vx1 = listRadius[indexVert] * cos(angle);
+				let vy1 = listRadius[indexVert] * sin(angle);
+				ObjPrim_SetVertexPosition(obj, indexVert + 0, vx1, vy1, 0);
+
+				let vx2 = listRadius[indexVert+1] * cos(angle);
+				let vy2 = listRadius[indexVert+1] * sin(angle);
+				ObjPrim_SetVertexPosition(obj, indexVert + 1, vx2, vy2, 0);
+
+				//魔方陣拡大
+				if(frame >= 0)
+				{//外側
+					let dr = (maxRadius * rRate - listRadius[indexVert]) / 8;
+					listRadius[indexVert] = listRadius[indexVert] + dr;
+				}
+				if(frame > 10)
+				{//内側
+					let rRateIn = rRate - 0.12;
+					if(rRateIn < 0){rRateIn=0;}
+					let dr= (maxRadius * rRateIn - listRadius[indexVert + 1]) / 16;
+					listRadius[indexVert + 1] = listRadius[indexVert + 1] + dr;
+				}
+
+			}
+
+			ObjRender_SetColor(obj, 192 * alpha, 192 * alpha, 255 * alpha);
+			ObjRender_SetPosition(obj, px, py, 0);
+			ObjRender_SetAngleZ(obj, angleRender);
+
+			frame++;
+		}
+
+		yield;
+	}
+}
+
+task TExplosion
+{
+	let path = GetCurrentScriptDirectory() ~ "Default_Player_Rumia.png";
+	let obj = ObjPrim_Create(OBJ_SPRITE_2D);
+	ObjRender_SetBlendType(obj, BLEND_ADD_RGB);
+	Obj_SetRenderPriority(obj, 0.60);
+	ObjPrim_SetTexture(obj, path);
+	ObjSprite2D_SetSourceRect(obj, 192, 0, 255, 63);
+	ObjSprite2D_SetDestRect(obj, -32, -32, 32, 32);
+
+	let alpha = 255;
+	let scale = 0;
+	loop(30)
+	{
+		scale += 0.2;
+		alpha -= 8;
+		ObjRender_SetColor(obj, alpha, alpha, alpha);
+		ObjRender_SetPosition(obj, GetPlayerX, GetPlayerY, 0);
+		ObjRender_SetScaleXYZ(obj, scale, scale, 1);
+		yield;
+	}
+	Obj_Delete(obj);
+}
+
+task TSpell
+{
+	let current = GetCurrentScriptDirectory();
+	let imgEffect = current ~ "Default_Player_RumiaSpell.png";
+
+	SetPlayerInvincibilityFrame(300);//無敵時間を設定
+	let bSlowMove = GetVirtualKeyState(VK_SLOWMOVE)==KEY_PUSH || GetVirtualKeyState(VK_SLOWMOVE)==KEY_HOLD;
+	let objManage = GetSpellManageObject();
+	
+	let enemyX = 0;
+	let enemyY = 0;
+
+	TShake();
+	effect(0);
+	effect(1);
+	loop(220)
+	{
+		enemyX = GetPlayerX();
+		enemyY = GetPlayerY();
+		let pos = GetEnemyIntersectionPosition(enemyX, enemyY, 1);
+		if(length(pos) > 0)
+		{
+			enemyX = pos[0][0];
+			enemyY = pos[0][1];
+		}
+		yield;
+	}
+	Obj_Delete(objManage);
+
+
+	task effect(num)
+	{	
+		//エフェクト用タスク
+		let tv=0;
+		let angle=0;
+		let alpha=0;	
+		task alphaState
+		{	//α値を変更するためのタスク
+			alpha=0;
+			loop(256/3){alpha+=3; yield;}
+			loop(90){yield;}
+			while(!Obj_IsDeleted(objManage)){alpha-=8; yield;}
+		}
+		task lineEffect
+		{
+			loop(120){concentrationLine();loop(1){yield;}}
+		}
+		alphaState;
+		if(bSlowMove){lineEffect;}
+		
+		let obj = ObjSpell_Create();//スペルオブジェクトを作成
+		ObjPrim_SetVertexCount(obj, 10);
+		ObjPrim_SetPrimitiveType(obj, PRIMITIVE_TRIANGLESTRIP);
+		ObjRender_SetBlendType(obj, BLEND_ADD_RGB);
+		Obj_SetRenderPriority(obj, 0.60);
+		ObjPrim_SetTexture(obj, imgEffect);
+		ObjSpell_Regist(obj);
+
+		ascent(i in 0..5)
+		{
+			let angle = -45+i*90;
+			let x;
+			let y;
+			if(bSlowMove)
+			{
+				//低速移動時は範囲が狭い
+				x = 192*cos(angle);
+				y = 192*sin(angle);
+			}
+			else
+			{
+				//高速移動時は広範囲
+				x = 512*cos(angle);
+				y = 512*sin(angle);
+			}
+			ObjPrim_SetVertexPosition(obj, i*2, x, y, 0);
+			ObjPrim_SetVertexPosition(obj, i*2+1, 0, 0, 0);
+			ObjPrim_SetVertexColor(obj, i*2, 0, 0, 0);
+		}
+		
+		while(!Obj_IsDeleted(objManage))
+		{
+			tv-=1;
+			if(num == 0){angle+=1;}
+			else if(num == 1){angle-=1;}
+			ObjRender_SetAngleZ(obj, angle);//描画角度を設定
+
+			if(bSlowMove)
+			{	//低速移動時
+				ObjRender_SetPosition(obj, enemyX, enemyY, 0);
+				ObjSpell_SetIntersectionCircle(obj, enemyX, enemyY, 81);//当たり判定を登録
+				ObjSpell_SetDamage(obj, 5);
+			}
+			else 
+			{	//高速移動時
+				ObjRender_SetPosition(obj, GetPlayerX, GetPlayerY, 0);//座標を設定
+				ObjSpell_SetIntersectionCircle(obj, GetPlayerX, GetPlayerY, 256);//当たり判定を登録
+				ObjSpell_SetDamage(obj, 2);
+			}
+			ascent(i in 0..5)
+			{
+				ObjPrim_SetVertexUVT(obj, i*2,   16*i, tv);//テクスチャの座標を設定
+				ObjPrim_SetVertexUVT(obj, i*2+1 ,32,  64+tv);
+				
+				ObjPrim_SetVertexColor(obj, i*2+1, alpha, alpha, alpha);
+			}
+			yield;
+		}
+		Obj_Delete(obj);
+	}
+
+	task concentrationLine()
+	{	//線が集まる感じのエフェクト
+		let angle = rand(0, 360);
+		let alpha=0;	
+		let scale=3;
+		
+		let obj = ObjPrim_Create(OBJ_PRIMITIVE_2D);//オブジェクトを作成
+		ObjPrim_SetVertexCount(obj, 3);//頂点を3個つくる
+		ObjPrim_SetPrimitiveType(obj, PRIMITIVE_TRIANGLELIST);//プリミティブタイプを設定
+		ObjRender_SetBlendType(obj, BLEND_ADD_RGB);//描画方法を設定
+		Obj_SetRenderPriority(obj, 0.60);
+		ObjPrim_SetTexture(obj, imgEffect);//テクスチャを設定
+		ObjRender_SetAngleZ(obj, angle);//描画角度を設定
+		
+		//頂点座標を設定
+		ObjPrim_SetVertexPosition(obj, 0,  0,  10, 0);
+		ObjPrim_SetVertexPosition(obj, 1, -10, 50, 0);
+		ObjPrim_SetVertexPosition(obj, 2, 10,  50, 0);
+		
+		//頂点のUV値を設定
+		ObjPrim_SetVertexUVT(obj, 0, 10,  10);
+		ObjPrim_SetVertexUVT(obj, 1,  0,  50);
+		ObjPrim_SetVertexUVT(obj, 2, 20,  50);
+		
+		//色設定
+		ObjPrim_SetVertexColor(obj, 0,  alpha, 0, alpha);
+		ObjPrim_SetVertexColor(obj, 1,  0, 0, 0);
+		ObjPrim_SetVertexColor(obj, 2,  0, 0, 0);
+		
+		loop(60)
+		{
+			scale-=3/60;
+			alpha+=5;
+			ObjPrim_SetVertexColor(obj, 0,  alpha, 0, alpha);
+			ObjRender_SetScaleXYZ(obj, scale, scale*3, 1);	
+			ObjRender_SetPosition(obj, enemyX, enemyY, 0);	
+			yield;	
+		}
+		Obj_Delete(obj);
+	}
+
+	task TShake()
+	{
+		while(!Obj_IsDeleted(objManage))
+		{
+			Set2DCameraFocusX(GetStgFrameWidth / 2 + rand(-8, 8));
+			Set2DCameraFocusY(GetStgFrameHeight / 2 + rand(-8, 8));
+			yield;
+		}
+
+		Reset2DCamera();
+	}
+}
