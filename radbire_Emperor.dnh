@@ -79,12 +79,14 @@ task TWork
 		
 		loop(8){ //ê‘ëÂíeÅ@å©íºÇµÇΩÇÁëÂéGîc3ï˚å¸Ç¡Ç€Ç¢
 			bulletBig(ex, ey, angle);
-			bulletBig(ex, ey, angle + 45);
-			bulletBig(ex, ey, angle - 45);
+			bulletBig(ex, ey, angle + 50);
+			bulletBig(ex, ey, angle - 50);
 		}
 		loop(bigStop){ yield; }
 		SetForbidPlayerShot(true);
 		SetForbidPlayerSpell(true);
+		let px = GetPlayerX();
+		let py = GetPlayerY();
 		let cy = GetStgFrameHeight / 2;
 		let shots = GetShotIdInCircleA1(cx, cy, cx + cy);
 		let scnt = GetShotCount(TARGET_PLAYER);
@@ -93,7 +95,12 @@ task TWork
 			ObjMove_SetSpeed(shots[i], 0);
 			ObjMove_AddPatternA1(shots[i], timeStop - bigStop, bs, NO_CHANGE);
 		}
-		loop(timeStop - bigStop){ yield; }
+		let pid = GetPlayerObjectID();
+		loop(timeStop - bigStop){ 
+			ObjMove_SetX(pid, px);
+			ObjMove_SetY(pid, py);
+			yield;
+		 }
 		SetForbidPlayerShot(false);
 		SetForbidPlayerSpell(false);
 		
